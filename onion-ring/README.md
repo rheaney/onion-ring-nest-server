@@ -2,7 +2,7 @@
 
 Companion fork of [Cody Kociemba's MIT-licensed NoLongerEvil SelfHosted](https://github.com/codykociemba/NoLongerEvil-SelfHosted), pinned initially to `bca8781012639c1cefc4a08c103fc892158fb630`. Upstream license/attribution are retained. Device patch and installer live in [onion-ring-nest](https://github.com/rheaney/onion-ring-nest).
 
-This branch establishes the source baseline and integration boundary; it does not yet change server runtime behavior or deploy a service. The upstream suite passed **217 tests** on October 12, 2026. Those tests qualify software behavior, not real thermostat/HVAC safety.
+This branch adds an optional thin runtime in `src/nolongerevil/onion_ring_proxy.py`; the original upstream entrypoint remains unchanged. The initial upstream baseline passed 217 tests. The thin adapter is separately tested with synthetic loopback devices; those tests qualify protocol/software behavior, not real thermostat/HVAC safety.
 
 ## Local-first integration boundary
 
@@ -24,3 +24,13 @@ The firmware uses the original Nest application for ring, schedules, hardware in
 ## Updates
 
 Keep `main` as the upstream baseline; our delta lives on `onion-ring`. Fetch from `upstream`, inspect changes, merge a chosen commit, and rerun the focused suite plus physical qualification when hardware use is authorized. Never roll an unqualified `latest` container onto an installed thermostat. Keep LAN endpoints, serials, credentials and home policy outside this public fork.
+
+## Optional thin runtime
+
+`python -m nolongerevil.onion_ring_proxy --config <private-config.json> --state-dir <private-state-directory> --socket <private-control.sock>` reuses the existing device protocol but omits the dashboard, public Control API listener, optional MQTT command integration and vendor-weather HTTP client. A host-owned telemetry publisher can consume the private socket separately; this module does not implement policy or publish canonical thermostat state.
+
+The configuration requires an explicit matching private IPv4 HTTP origin/bind, enrolled serials and per-device credential environment-variable names; an empty device list is a valid awaiting-enrollment mode. Never commit the actual configuration, credentials, serials or infrastructure addresses here. Device control is disabled by default. POST commands additionally require a controller token, fresh observed mode/capability, an active native subscription, a bounded TTL and a durable request ID. Observations are independent from the server's desired-state cache; dispatch is not reported as confirmation without a subsequent fresh matching device report. Failed/expired/interrupted commands are not replayed. No silent temperature clamping.
+
+Legacy route aliases are registered explicitly so they traverse the same auth/observation middleware as canonical paths. This avoids the upstream URL normalizer's direct-handler middleware bypass. Broken-connection push buffering is disabled in this runtime. Vendor weather is deliberately unavailable rather than silently calling Google. Full physical/offline/power/recovery qualification is still required before connecting a thermostat or enabling writes.
+
+October12 qualification: full suite **247 passed**, including **30 thin-proxy boundary/emulator tests**; Ruff, formatting and mypy pass. No real thermostat was used in these tests.
